@@ -35,9 +35,16 @@ const char *fragmentSource = R"(
 		vec3 Le, La;
 	};
 
+
+
 	struct Sphere {
 		vec3 center;
 		float radius;
+	};
+
+	//my code
+	struct Ellipsoid {
+		vec3 param;
 	};
 
 	struct Hit {
@@ -52,11 +59,14 @@ const char *fragmentSource = R"(
 
 	const int nMaxObjects = 500;
 
-	uniform vec3 wEye; 
-	uniform Light light;     
+	uniform vec3 wEye;
+	uniform Light light;
+	uniform Ellipsoid goldellipse;
 	uniform Material materials[2];  // diffuse, specular, ambient ref
+	/*
 	uniform int nObjects;
 	uniform Sphere objects[nMaxObjects];
+	*/
 
 	in  vec3 p;					// point on camera window corresponding to the pixel
 	out vec4 fragmentColor;		// output that goes to the raster memory as told by glBindFragDataLocation
@@ -80,25 +90,65 @@ const char *fragmentSource = R"(
 		return hit;
 	}
 
+	Hit intersect(const Ellipsoid object, const Ray ray) {
+		Hit hit;
+		hit.t = -1;
+		//my code
+		float da = ray.start.x * ray.start.x;
+		float db = ray.start.y * ray.start.y;
+		float dc = ray.start.z * ray.start.z;
+		float ea = 2 * ray.start.x * ray.dir.x;
+		float eb = 2 * ray.start.y * ray.dir.y;
+		float ec = 2 * ray.start.z * ray.dir.z;
+		float fa = 2 * ray.dir.x * ray.dir.x;
+		float fb = 2 * ray.dir.y * ray.dir.y;
+		float fc = 2 * ray.dir.z * ray.dir.z;
+
+		float c = (object.param.x*da + object.param.y*db + object.param.z*dc - 1);
+		float b = (object.param.x*ea + object.param.y*eb + object.param.z*ec);
+		float a = (object.param.x*fa + object.param.y*fb + object.param.z*fc);
+		//end of my code
+
+		float discr = b * b - 4.0f * a * c;
+		if (discr < 0) return hit;
+		float sqrt_discr = sqrt(discr);
+		float t1 = (-b + sqrt_discr) / 2.0f / a;	// t1 >= t2 for sure
+		float t2 = (-b - sqrt_discr) / 2.0f / a;
+		if (t1 <= 0) return hit;
+		hit.t = (t2 > 0) ? t2 : t1;
+		//my code
+		hit.position = ray.start + (ray.dir * hit.t);
+		hit.normal = normalize(hit.position * object.param);
+		return hit;
+	}
+
 	Hit firstIntersect(Ray ray) {
 		Hit bestHit;
 		bestHit.t = -1;
+		/*
 		for (int o = 0; o < nObjects; o++) {
 			Hit hit = intersect(objects[o], ray); //  hit.t < 0 if no intersection
 			if (o < nObjects/2) hit.mat = 0;	 // half of the objects are rough
 			else			    hit.mat = 1;     // half of the objects are reflective
 			if (hit.t > 0 && (bestHit.t < 0 || hit.t < bestHit.t))  bestHit = hit;
 		}
+		*/
+		Hit hit = intersect(goldellipse, ray);
+		hit.mat = 0;
+		if (hit.t > 0 && (bestHit.t < 0 || hit.t < bestHit.t))  bestHit = hit;
+
 		if (dot(ray.dir, bestHit.normal) > 0) bestHit.normal = bestHit.normal * (-1);
 		return bestHit;
 	}
 
 	bool shadowIntersect(Ray ray) {	// for directional lights
+		/*
 		for (int o = 0; o < nObjects; o++) if (intersect(objects[o], ray).t > 0) return true; //  hit.t < 0 if no intersection
+		*/
 		return false;
 	}
 
-	vec3 Fresnel(vec3 F0, float cosTheta) { 
+	vec3 Fresnel(vec3 F0, float cosTheta) {
 		return F0 + (vec3(1, 1, 1) - F0) * pow(cosTheta, 5);
 	}
 
@@ -135,9 +185,9 @@ const char *fragmentSource = R"(
 
 	void main() {
 		Ray ray;
-		ray.start = wEye; 
+		ray.start = wEye;
 		ray.dir = normalize(p - wEye);
-		fragmentColor = vec4(trace(ray), 1); 
+		fragmentColor = vec4(trace(ray), 1);
 	}
 )";
 
@@ -180,6 +230,15 @@ struct Sphere {
 	float radius;
 
 	Sphere(const vec3& _center, float _radius) { center = _center; radius = _radius; }
+};
+
+// my code
+//---------------------------
+struct Ellipsoid
+{
+	vec3 param;
+	Ellipsoid(const vec3 & _param) {param = _param;}
+
 };
 
 //---------------------------
@@ -246,6 +305,11 @@ public:
 		setUniform(camera.up, "wUp");
 	}
 
+	//my code
+	void setUniformEllipse(Ellipsoid* goldellipse) {
+		setUniform(goldellipse->param , "goldellipse.param");
+	}
+
 	void setUniformObjects(const std::vector<Sphere*>& objects) {
 		setUniform((int)objects.size(), "nObjects");
 		char name[256];
@@ -254,6 +318,7 @@ public:
 			sprintf(name, "objects[%d].radius", o);  setUniform(objects[o]->radius, name);
 		}
 	}
+
 };
 
 float rnd() { return (float)rand() / RAND_MAX; }
@@ -262,6 +327,7 @@ float rnd() { return (float)rand() / RAND_MAX; }
 class Scene {
 //---------------------------
 	std::vector<Sphere *> objects;
+	Ellipsoid *goldellipse;
 	std::vector<Light *> lights;
 	Camera camera;
 	std::vector<Material *> materials;
@@ -273,19 +339,27 @@ public:
 		float fov = 45 * (float)M_PI / 180;
 		camera.set(eye, lookat, vup, fov);
 
-		lights.push_back(new Light(vec3(1, 1, 1), vec3(3, 3, 3), vec3(0.4f, 0.3f, 0.3f)));
+		// my code
+		// setting Le to zero makes the light non directional, i.e. point light
+		lights.push_back(new Light(vec3(0, 0, 0), vec3(0, 0, 0), vec3(0.7f, 0.7f, 0.7f)));
 
 		vec3 kd(0.3f, 0.2f, 0.1f), ks(10, 10, 10);
 		materials.push_back(new RoughMaterial(kd, ks, 50));
 		materials.push_back(new SmoothMaterial(vec3(0.9f, 0.85f, 0.8f)));
 
-		for (int i = 0; i < 500; i++)
+		goldellipse = new Ellipsoid {vec3(10,11,12)};
+		/*
+		for (int i = 0; i < 10; i++)
 			objects.push_back(new Sphere(vec3(rnd() - 0.5f, rnd() - 0.5f, rnd() - 0.5f), rnd() * 0.1f));
-
+			*/
 	}
 
 	void setUniform(Shader& shader) {
+		//my code
+		shader.setUniformEllipse(goldellipse);
+		/*
 		shader.setUniformObjects(objects);
+		*/
 		shader.setUniformMaterials(materials);
 		shader.setUniformLight(lights[0]);
 		shader.setUniformCamera(camera);
@@ -312,7 +386,7 @@ public:
 		// vertex coordinates: vbo0 -> Attrib Array 0 -> vertexPosition of the vertex shader
 		glBindBuffer(GL_ARRAY_BUFFER, vbo); // make it active, it is an array
 		float vertexCoords[] = { -1, -1,  1, -1,  1, 1,  -1, 1 };	// two triangles forming a quad
-		glBufferData(GL_ARRAY_BUFFER, sizeof(vertexCoords), vertexCoords, GL_STATIC_DRAW);	   // copy to that part of the memory which is not modified 
+		glBufferData(GL_ARRAY_BUFFER, sizeof(vertexCoords), vertexCoords, GL_STATIC_DRAW);	   // copy to that part of the memory which is not modified
 		glEnableVertexAttribArray(0);
 		glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, 0, NULL);     // stride and offset: it is tightly packed
 	}
@@ -342,9 +416,9 @@ void onDisplay() {
 	nFrames++;
 	static long tStart = glutGet(GLUT_ELAPSED_TIME);
 	long tEnd = glutGet(GLUT_ELAPSED_TIME);
-	printf("%d msec\r", (tEnd - tStart) / nFrames);
+	printf("%ld msec\r", (tEnd - tStart) / nFrames);
 
-	glClearColor(1.0f, 0.5f, 0.8f, 1.0f);							// background color 
+	glClearColor(1.0f, 0.5f, 0.8f, 1.0f);							// background color
 	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT); // clear the screen
 
 	scene.setUniform(shader);
