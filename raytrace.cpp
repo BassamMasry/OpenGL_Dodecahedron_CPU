@@ -3,10 +3,25 @@
 //=============================================================================================
 #include "framework.h"
 
+enum MaterialType {ROUGH, REFLECTIVE, REFRACTIVE};
+
 struct Material {
 	vec3 ka, kd, ks;
 	float  shininess;
+	vec3 F0;
+	float ior;
+	MaterialType type;
+	Material(MaterialType t) {type = t;}
 	Material(vec3 _kd, vec3 _ks, float _shininess) : ka(_kd * M_PI), kd(_kd), ks(_ks) { shininess = _shininess; }
+};
+
+struct ReflectiveMat : Material
+{
+	ReflectiveMat(vec3 n, vec3 kappa) : Material(REFLECTIVE)
+	{
+		vec3 one(1,1,1);
+		F0 = ((n-one) *(n-one) + kappa * kappa) / ((n + one) * (n +one) + kappa * kappa);
+	}
 };
 
 struct Hit {
@@ -58,20 +73,71 @@ struct Sphere : public Intersectable {
 	}
 };
 
-class Camera {
+struct Ellipsoid : public Intersectable {
+	vec3 param;
+
+	Ellipsoid(const vec3& _param, Material* _material) {
+		param = _param;
+		material = _material;
+	}
+
+	Hit intersect(const Ray& ray) {
+		Hit hit;
+		hit.t = -1;
+		//my code
+		float da = ray.start.x * ray.start.x;
+		float db = ray.start.y * ray.start.y;
+		float dc = ray.start.z * ray.start.z;
+		float ea = 2 * ray.start.x * ray.dir.x;
+		float eb = 2 * ray.start.y * ray.dir.y;
+		float ec = 2 * ray.start.z * ray.dir.z;
+		float fa = 2 * ray.dir.x * ray.dir.x;
+		float fb = 2 * ray.dir.y * ray.dir.y;
+		float fc = 2 * ray.dir.z * ray.dir.z;
+
+		float c = (param.x*da + param.y*db + param.z*dc - 1);
+		float b = (param.x*ea + param.y*eb + param.z*ec);
+		float a = (param.x*fa + param.y*fb + param.z*fc);
+		//end of my code
+
+		float discr = b * b - 4.0f * a * c;
+		if (discr < 0) return hit;
+		float sqrt_discr = sqrtf(discr);
+		float t1 = (-b + sqrt_discr) / 2.0f / a;	// t1 >= t2 for sure
+		float t2 = (-b - sqrt_discr) / 2.0f / a;
+		if (t1 <= 0) return hit;
+		hit.t = (t2 > 0) ? t2 : t1;
+		//printf("T is: %f\n" ,hit.t);
+		hit.position = ray.start + ray.dir * hit.t;
+		hit.normal = normalize(hit.position * param);
+		hit.material = material;
+		return hit;
+	}
+};
+
+struct Camera {
+//---------------------------
 	vec3 eye, lookat, right, up;
+	float fov;
 public:
-	void set(vec3 _eye, vec3 _lookat, vec3 vup, float fov) {
+	void set(vec3 _eye, vec3 _lookat, vec3 vup, float _fov) {
 		eye = _eye;
 		lookat = _lookat;
+		fov = _fov;
 		vec3 w = eye - lookat;
-		float focus = length(w);
-		right = normalize(cross(vup, w)) * focus * tanf(fov / 2);
-		up = normalize(cross(w, right)) * focus * tanf(fov / 2);
+		float f = length(w);
+		right = normalize(cross(vup, w)) * f * tanf(fov / 2);
+		up = normalize(cross(w, right)) * f * tanf(fov / 2);
 	}
 	Ray getRay(int X, int Y) {
 		vec3 dir = lookat + right * (2.0f * (X + 0.5f) / windowWidth - 1) + up * (2.0f * (Y + 0.5f) / windowHeight - 1) - eye;
 		return Ray(eye, dir);
+	}
+	void Animate(float dt) {
+		eye = vec3((eye.x - lookat.x) * cos(dt) + (eye.z - lookat.z) * sin(dt) + lookat.x,
+			eye.y,
+			-(eye.x - lookat.x) * sin(dt) + (eye.z - lookat.z) * cos(dt) + lookat.z);
+		set(eye, lookat, up, fov);
 	}
 };
 
@@ -95,18 +161,28 @@ class Scene {
 	vec3 La;
 public:
 	void build() {
-		vec3 eye = vec3(0, 0, 2), vup = vec3(0, 1, 0), lookat = vec3(0, 0, 0);
+		vec3 eye = vec3(0, 0, 5.0f), vup = vec3(0, 1, 0), lookat = vec3(0, 0, 0);
 		float fov = 45 * M_PI / 180;
 		camera.set(eye, lookat, vup, fov);
 
 		La = vec3(0.4f, 0.4f, 0.4f);
-		vec3 lightDirection(1, 1, 1), Le(2, 2, 2);
+		vec3 lightDirection(1, 1, 1), Le(3, 3, 3);
 		lights.push_back(new Light(lightDirection, Le));
 
 		vec3 kd(0.3f, 0.2f, 0.1f), ks(2, 2, 2);
 		Material * material = new Material(kd, ks, 50);
-		for (int i = 0; i < 500; i++) 
-			objects.push_back(new Sphere(vec3(rnd() - 0.5f, rnd() - 0.5f, rnd() - 0.5f), rnd() * 0.1f, material));
+		vec3 nGold (0.17f, 0.35f, 1.5f);
+		vec3 kGold (3.1f, 2.7f, 1.9f);
+		ReflectiveMat* goldMaterial= new ReflectiveMat(nGold, kGold);
+		for (int i = 0; i < 5; i++)
+		{
+			objects.push_back(new Sphere(vec3(rnd() - 0.5f, rnd() - 0.5f, rnd() - 0.5f), rnd() * 0.1f, goldMaterial));
+		}
+		objects.push_back(new Ellipsoid(vec3(.1f,.2f,.3f), goldMaterial));
+		// objects.push_back(new Ellipsoid(vec3(.05f,.06f,.07f), goldMaterial));
+		objects.push_back(new Sphere(vec3(rnd() - 0.5f, rnd() - 0.5f, rnd() - 0.5f), rnd() * 0.1f, material));
+
+			// printf("random is %f\n", rnd());
 	}
 
 	void render(std::vector<vec4>& image) {
@@ -150,6 +226,8 @@ public:
 		}
 		return outRadiance;
 	}
+
+	void Animate(float dt) { camera.Animate(dt); }
 };
 
 GPUProgram gpuProgram; // vertex and fragment shaders
@@ -179,7 +257,7 @@ const char *fragmentSource = R"(
 	out vec4 fragmentColor;		// output that goes to the raster memory as told by glBindFragDataLocation
 
 	void main() {
-		fragmentColor = texture(textureUnit, texcoord); 
+		fragmentColor = texture(textureUnit, texcoord);
 	}
 )";
 
@@ -188,7 +266,7 @@ class FullScreenTexturedQuad {
 	Texture texture;
 public:
 	FullScreenTexturedQuad(int windowWidth, int windowHeight, std::vector<vec4>& image)
-		: texture(windowWidth, windowHeight, image) 
+		: texture(windowWidth, windowHeight, image)
 	{
 		glGenVertexArrays(1, &vao);	// create 1 vertex array object
 		glBindVertexArray(vao);		// make it active
@@ -199,7 +277,7 @@ public:
 		// vertex coordinates: vbo0 -> Attrib Array 0 -> vertexPosition of the vertex shader
 		glBindBuffer(GL_ARRAY_BUFFER, vbo); // make it active, it is an array
 		float vertexCoords[] = { -1, -1,  1, -1,  1, 1,  -1, 1 };	// two triangles forming a quad
-		glBufferData(GL_ARRAY_BUFFER, sizeof(vertexCoords), vertexCoords, GL_STATIC_DRAW);	   // copy to that part of the memory which is not modified 
+		glBufferData(GL_ARRAY_BUFFER, sizeof(vertexCoords), vertexCoords, GL_STATIC_DRAW);	   // copy to that part of the memory which is not modified
 		glEnableVertexAttribArray(0);
 		glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, 0, NULL);     // stride and offset: it is tightly packed
 	}
@@ -222,7 +300,7 @@ void onInitialization() {
 	long timeStart = glutGet(GLUT_ELAPSED_TIME);
 	scene.render(image);
 	long timeEnd = glutGet(GLUT_ELAPSED_TIME);
-	printf("Rendering time: %d milliseconds\n", (timeEnd - timeStart));
+	printf("Rendering time: %ld milliseconds\n", (timeEnd - timeStart));
 
 	// copy image to GPU as a texture
 	fullScreenTexturedQuad = new FullScreenTexturedQuad(windowWidth, windowHeight, image);
@@ -256,4 +334,7 @@ void onMouseMotion(int pX, int pY) {
 
 // Idle event indicating that some time elapsed: do animation here
 void onIdle() {
+	//printf("Animating");
+	scene.Animate(20.0f);
+	glutPostRedisplay();
 }
