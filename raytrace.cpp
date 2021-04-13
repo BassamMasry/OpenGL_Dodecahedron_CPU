@@ -226,8 +226,8 @@ public:
 		{
 			// objects.push_back(new Sphere(vec3(rnd() - 0.5f, rnd() - 0.5f, rnd() - 0.5f), rnd() * 0.1f, material));
 		}
+		// objects.push_back(new Ellipsoid(vec3(.05f,.06f,.07f), goldMaterial));
 		// objects.push_back(new Ellipsoid(vec3(.1f,.2f,.3f), goldMaterial));
-		objects.push_back(new Ellipsoid(vec3(.05f,.06f,.07f), goldMaterial));
 		// objects.push_back(new Sphere(vec3(rnd() - 0.5f, rnd() - 0.5f, rnd() - 0.5f), rnd() * 0.1f, goldMaterial));
 
 			// printf("random is %f\n", rnd());
@@ -321,6 +321,7 @@ public:
 };
 
 GPUProgram gpuProgram; // vertex and fragment shaders
+GPUProgram DodegpuProgram; // vertex and fragment shaders
 Scene scene;
 
 // vertex shader in GLSL
@@ -350,6 +351,64 @@ const char *fragmentSource = R"(
 		fragmentColor = texture(textureUnit, texcoord);
 	}
 )";
+
+//my code
+// fragment shader in GLSL
+const char * const DodevertexSource = R"(
+	#version 330				// Shader 3.3
+	precision highp float;		// normal floats, makes no difference on desktop computers
+
+	uniform mat4 MVP;			// uniform variable, the Model-View-Projection transformation matrix
+	layout(location = 0) in vec2 vp;	// Varying input: vp = vertex position is expected in attrib array 0
+
+	void main() {
+		gl_Position = vec4(vp.x, vp.y, 0, 1) * MVP;		// transform vp from modeling space to normalized device space
+	}
+)";
+
+const char * const DodefragmentSource = R"(
+	#version 330			// Shader 3.3
+	precision highp float;	// normal floats, makes no difference on desktop computers
+
+	uniform vec3 color;		// uniform variable, the color of the primitive
+	out vec4 outColor;		// computed color of the current pixel
+
+	void main() {
+		outColor = vec4(color, 1);	// computed color is the color of the primitive
+	}
+)";
+
+class Dodecahedron
+{
+	unsigned int vao;	   // virtual world on the GPU
+	public :
+	Dodecahedron (float *vertices)
+	{
+	glGenVertexArrays(1, &vao);	// get 1 vao id
+	glBindVertexArray(vao);		// make it active
+
+	unsigned int vbo;		// vertex buffer object
+	glGenBuffers(1, &vbo);	// Generate 1 buffer
+	glBindBuffer(GL_ARRAY_BUFFER, vbo);
+	glBufferData(GL_ARRAY_BUFFER, 	// Copy to GPU target
+		sizeof(vertices),  // # bytes
+		vertices,	      	// address
+		GL_STATIC_DRAW);	// we do not change later
+
+	glEnableVertexAttribArray(0);  // AttribArray 0
+	glVertexAttribPointer(0,       // vbo -> AttribArray 0
+		3, GL_FLOAT, GL_FALSE, // three floats/attrib, not fixed-point
+		0, NULL); 		     // stride, offset: tightly packed
+		DodegpuProgram.create(DodevertexSource, DodefragmentSource, "outColor");
+	}
+void Draw()
+{
+		glBindVertexArray(vao);  // Draw call
+		glDrawArrays(GL_TRIANGLES, 0 /*startIdx*/, 5 /*# Elements*/);
+
+		glutSwapBuffers(); // exchange buffers for double buffering
+	}
+};
 
 class FullScreenTexturedQuad {
 	unsigned int vao;	// vertex array object id and texture id
@@ -385,7 +444,13 @@ FullScreenTexturedQuad * fullScreenTexturedQuad;
 void onInitialization() {
 	glViewport(0, 0, windowWidth, windowHeight);
 	scene.build();
-
+	float cahedronVert[] = {0, 0.618, 1.618,0, -0.618, 1.618,0, -0.618, -1.618,0, 0.618, -1.618,1.618, 0,
+	0.618,-1.618, 0, 0.618,-1.618, 0, -0.618,1.618, 0, -0.618,0.618, 1.618, 0,
+	-0.618, 1.618, 0,-0.618, -1.618, 0,0.618, -1.618, 0,1, 1, 1,-1, 1, 1,-1, -1,
+	1,1, -1, 1,1, -1, -1,1, 1, -1,-1, 1, -1,-1, -1, -1};
+	glBufferData(GL_ARRAY_BUFFER, sizeof(cahedronVert), cahedronVert, GL_STATIC_DRAW);
+	// Dodecahedron dode (cahedronVert);
+	// dode.Draw();
 	std::vector<vec4> image(windowWidth * windowHeight);
 	long timeStart = glutGet(GLUT_ELAPSED_TIME);
 	scene.render(image);
