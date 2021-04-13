@@ -12,13 +12,28 @@ struct Material {
 	float ior;
 	MaterialType type;
 	Material(MaterialType t) {type = t;}
-	Material(vec3 _kd, vec3 _ks, float _shininess) : ka(_kd * M_PI), kd(_kd), ks(_ks) { shininess = _shininess; }
+};
+
+struct RoughMaterial : Material
+{
+	RoughMaterial(vec3 _kd, vec3 _ks, float _shininess) : Material(ROUGH)
+	{
+		ka = _kd * M_PI;
+		kd = _kd;
+		ks = _ks;
+		shininess = _shininess;
+	}
 };
 
 struct ReflectiveMat : Material
 {
 	ReflectiveMat(vec3 n, vec3 kappa) : Material(REFLECTIVE)
 	{
+		/*
+		kd = vec3(0.3f, 0.2f, 0.1f);
+		ks = vec3(2, 2, 2);
+		shininess = 50;
+		*/
 		vec3 one(1,1,1);
 		F0 = ((n-one) *(n-one) + kappa * kappa) / ((n + one) * (n +one) + kappa * kappa);
 	}
@@ -161,7 +176,7 @@ class Scene {
 	vec3 La;
 public:
 	void build() {
-		vec3 eye = vec3(0, 0, 5.0f), vup = vec3(0, 1, 0), lookat = vec3(0, 0, 0);
+		vec3 eye = vec3(0, 0, 2.0f), vup = vec3(0, 1, 0), lookat = vec3(0, 0, 0);
 		float fov = 45 * M_PI / 180;
 		camera.set(eye, lookat, vup, fov);
 
@@ -170,17 +185,22 @@ public:
 		lights.push_back(new Light(lightDirection, Le));
 
 		vec3 kd(0.3f, 0.2f, 0.1f), ks(2, 2, 2);
-		Material * material = new Material(kd, ks, 50);
+		Material * material = new RoughMaterial(kd, ks, 50);
+
 		vec3 nGold (0.17f, 0.35f, 1.5f);
 		vec3 kGold (3.1f, 2.7f, 1.9f);
 		ReflectiveMat* goldMaterial= new ReflectiveMat(nGold, kGold);
+
+		vec3 nSilver (0.14f, 0.16f, 0.13f);
+		vec3 kSilver (4.1f, 2.3f, 3.1f);
+		ReflectiveMat* silverMaterial = new ReflectiveMat(nSilver, kSilver);
 		for (int i = 0; i < 5; i++)
 		{
-			objects.push_back(new Sphere(vec3(rnd() - 0.5f, rnd() - 0.5f, rnd() - 0.5f), rnd() * 0.1f, goldMaterial));
+			objects.push_back(new Sphere(vec3(rnd() - 0.5f, rnd() - 0.5f, rnd() - 0.5f), rnd() * 0.1f, material));
 		}
-		objects.push_back(new Ellipsoid(vec3(.1f,.2f,.3f), goldMaterial));
+		// objects.push_back(new Ellipsoid(vec3(.1f,.2f,.3f), goldMaterial));
 		// objects.push_back(new Ellipsoid(vec3(.05f,.06f,.07f), goldMaterial));
-		objects.push_back(new Sphere(vec3(rnd() - 0.5f, rnd() - 0.5f, rnd() - 0.5f), rnd() * 0.1f, material));
+		objects.push_back(new Sphere(vec3(rnd() - 0.5f, rnd() - 0.5f, rnd() - 0.5f), rnd() * 0.1f, goldMaterial));
 
 			// printf("random is %f\n", rnd());
 	}
@@ -210,6 +230,47 @@ public:
 		return false;
 	}
 
+
+	vec3 trace(Ray ray, int depth = 0)
+	{
+	if (depth > 5) return La;
+	Hit hit = firstIntersect(ray);
+	if (hit.t <0) return La;
+
+	if (hit.material->type == ROUGH)
+	{
+		vec3 outRadiance = hit.material->ka * La;
+		for (Light * light : lights) {
+			Ray shadowRay(hit.position + hit.normal * epsilon, light->direction);
+			float cosTheta = dot(hit.normal, light->direction);
+			if (cosTheta > 0 && !shadowIntersect(shadowRay)) {	// shadow computation
+				outRadiance = outRadiance + light->Le * hit.material->kd * cosTheta;
+				vec3 halfway = normalize(-ray.dir + light->direction);
+				float cosDelta = dot(hit.normal, halfway);
+				if (cosDelta > 0) outRadiance = outRadiance + light->Le * hit.material->ks * powf(cosDelta, hit.material->shininess);
+			}
+		}
+		return outRadiance;
+	}
+
+	float cosa = -dot(ray.dir, hit.normal);
+	vec3 one(1,1,1);
+	vec3 F = hit.material-> F0 + (one - hit.material->F0) * pow(1-cosa, 5);
+	vec3 reflectedDir = ray.dir - hit.normal * dot(hit.normal, ray.dir) * 2.0f;
+	vec3 outRadiance = trace(Ray(hit.position + hit.normal * epsilon, reflectedDir), depth +1) * F;
+
+	if (hit.material -> type == REFRACTIVE)
+	{
+		float disc = 1 - (1- cosa * cosa) / hit.material-> ior / hit.material-> ior; // scalar n
+		if (disc >= 0)
+		{
+			vec3 refractedDir = ray.dir / hit.material-> ior + hit.normal * (cosa / hit.material-> ior - sqrt(disc));
+			outRadiance = outRadiance + trace(Ray(hit.position - hit.normal * epsilon, refractedDir), depth + 1) * (one- F);
+		}
+	}
+	return outRadiance;
+}
+/*
 	vec3 trace(Ray ray, int depth = 0) {
 		Hit hit = firstIntersect(ray);
 		if (hit.t < 0) return La;
@@ -226,6 +287,7 @@ public:
 		}
 		return outRadiance;
 	}
+	*/
 
 	void Animate(float dt) { camera.Animate(dt); }
 };
