@@ -156,6 +156,34 @@ public:
 	}
 };
 
+/*
+struct Camera {
+//---------------------------
+	vec3 eye, lookat, right, up;
+	float fov;
+public:
+	void set(vec3 _eye, vec3 _lookat, vec3 vup, float _fov) {
+		eye = _eye;
+		lookat = _lookat;
+		fov = _fov;
+		vec3 w = eye - lookat;
+		float f = length(w);
+		right = normalize(cross(vup, w)) * f * tanf(fov / 2);
+		up = normalize(cross(w, right)) * f * tanf(fov / 2);
+	}
+	Ray getRay(int X, int Y) {
+		vec3 dir = lookat + right * (2.0f * (X + 0.5f) / windowWidth - 1) + up * (2.0f * (Y + 0.5f) / windowHeight - 1) - eye;
+		return Ray(eye, dir);
+	}
+	void Animate(float dt) {
+		eye = vec3((eye.x - lookat.x) * cos(dt) + (eye.z - lookat.z) * sin(dt) + lookat.x,
+			eye.y,
+			-(eye.x - lookat.x) * sin(dt) + (eye.z - lookat.z) * cos(dt) + lookat.z);
+		set(eye, lookat, up, fov);
+	}
+};
+*/
+
 struct Light {
 	vec3 direction;
 	vec3 Le;
@@ -176,13 +204,13 @@ class Scene {
 	vec3 La;
 public:
 	void build() {
-		vec3 eye = vec3(0, 0, 2.0f), vup = vec3(0, 1, 0), lookat = vec3(0, 0, 0);
+		vec3 eye = vec3(0, 0, 5.0f), vup = vec3(0, 1, 0), lookat = vec3(0, 0, 0);
 		float fov = 45 * M_PI / 180;
 		camera.set(eye, lookat, vup, fov);
 
-		La = vec3(0.4f, 0.4f, 0.4f);
+		La = vec3(0.7f, 0.7f, 0.7f);
 		vec3 lightDirection(1, 1, 1), Le(3, 3, 3);
-		lights.push_back(new Light(lightDirection, Le));
+		// lights.push_back(new Light(lightDirection, Le));
 
 		vec3 kd(0.3f, 0.2f, 0.1f), ks(2, 2, 2);
 		Material * material = new RoughMaterial(kd, ks, 50);
@@ -196,11 +224,11 @@ public:
 		ReflectiveMat* silverMaterial = new ReflectiveMat(nSilver, kSilver);
 		for (int i = 0; i < 5; i++)
 		{
-			objects.push_back(new Sphere(vec3(rnd() - 0.5f, rnd() - 0.5f, rnd() - 0.5f), rnd() * 0.1f, material));
+			// objects.push_back(new Sphere(vec3(rnd() - 0.5f, rnd() - 0.5f, rnd() - 0.5f), rnd() * 0.1f, material));
 		}
 		// objects.push_back(new Ellipsoid(vec3(.1f,.2f,.3f), goldMaterial));
-		// objects.push_back(new Ellipsoid(vec3(.05f,.06f,.07f), goldMaterial));
-		objects.push_back(new Sphere(vec3(rnd() - 0.5f, rnd() - 0.5f, rnd() - 0.5f), rnd() * 0.1f, goldMaterial));
+		objects.push_back(new Ellipsoid(vec3(.05f,.06f,.07f), goldMaterial));
+		// objects.push_back(new Sphere(vec3(rnd() - 0.5f, rnd() - 0.5f, rnd() - 0.5f), rnd() * 0.1f, goldMaterial));
 
 			// printf("random is %f\n", rnd());
 	}
@@ -397,6 +425,4 @@ void onMouseMotion(int pX, int pY) {
 // Idle event indicating that some time elapsed: do animation here
 void onIdle() {
 	//printf("Animating");
-	scene.Animate(20.0f);
-	glutPostRedisplay();
 }
