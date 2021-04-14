@@ -134,10 +134,25 @@ struct Ellipsoid : public Intersectable {
 struct Plane : public Intersectable
 {
 	vec4 param;
+	Material * reflectivematerial;
+	vec3 points[5];
 
-	Plane(const vec3& _p1, const vec3& _p2, const vec3& _p3, Material * _material)
+	Plane(const vec3& _p1, const vec3& _p2, const vec3& _p3,const vec3& _p4, const vec3& _p5, Material * _roughmaterial, Material * _reflectivematerial)
 	{
-		material = _material;
+		material = _roughmaterial;
+		reflectivematerial = _reflectivematerial;
+		points[0] = _p1;
+		points[1] = _p2;
+		points[2] = _p3;
+		points[3] = _p4;
+		points[4] = _p5;
+
+		/*
+		for (int i = 0; i< 5; ++i)
+		{
+			printf("Points are %f %f %f\n", points[i].x, points[i].y, points[i].z);
+		}
+		*/
 
 		vec3 p1p2 = _p2 - _p1;
 		vec3 p1p3 = _p3 - _p1;
@@ -147,7 +162,7 @@ struct Plane : public Intersectable
 
 		param = vec4(normal.x, normal.y, normal.z, d);
 
-		printf("Parameters are: %f, %f, %f, %f\n", param.x, param.y, param.z, d);
+		// printf("Parameters are: %f, %f, %f, %f\n", param.x, param.y, param.z, d);
 
 	}
 
@@ -168,7 +183,7 @@ struct Plane : public Intersectable
 		// printf("t is: %f\n", hit.t);
 		hit.position = ray.start + ray.dir * hit.t;
 		hit.normal = normalize(vec3(param.x, param.y, param.z));
-		hit.material = material;
+		hit.material = reflectivematerial;
 		return hit;
 	}
 };
@@ -266,18 +281,18 @@ class Scene {
 	vec3 (-1, 1, -1),
 	vec3 (-1, -1, -1)};
 
-	int faces[36] = {1,2,16,
-	1,13,9,
-	1,14,6,
-	2,15,11,
-	3,4,18,
-	3,17,12,
-	3,20,7,
-	19,10,9,
-	16,12,17,
-	5,8,18,
-	14,10,19,
-	6,7,20};
+	int faces[60] = {1,2,16,5,13,
+	1,13,9,10,14,
+	1,14,6,15,2,
+	2,15,11,12,16,
+	3,4,18,8,17,
+	3,17,12,11,20,
+	3,20,7,19,4,
+	19,10,9,18,4,
+	16,12,17,8,5,
+	5,8,18,9,13,
+	14,10,19,7,6,
+	6,7,20,11,15};
 
 public:
 	void build() {
@@ -305,9 +320,10 @@ public:
 		ReflectiveMat* silverMaterial = new ReflectiveMat(nSilver, kSilver);
 
 		int facesSize = sizeof(faces)/ sizeof(int);
-		for (int i = 0; i < facesSize; i = i + 3)
+		for (int i = 0; i < facesSize; i = i + 5)
 		{
-			objects.push_back(new Plane(points[faces[i]-1], points[faces[i+1]-1], points[faces[i+2]-1], material2));
+			objects.push_back(new Plane(points[faces[i]-1], points[faces[i+1]-1],
+				 points[faces[i+2]-1], points[faces[i+3]-1], points[faces[i+4]-1], material2, silverMaterial));
 			// objects.push_back(new Sphere(vec3(rnd() - 0.5f, rnd() - 0.5f, rnd() - 0.5f), rnd() * 0.1f, material));
 		}
 		// objects.push_back(new Plane(vec3(0,0,0), vec3(1,0,0), vec3(0,1,0), material));
