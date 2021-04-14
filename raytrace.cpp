@@ -100,19 +100,19 @@ struct Ellipsoid : public Intersectable {
 		Hit hit;
 		hit.t = -1;
 		//my code
-		float da = ray.start.x * ray.start.x;
-		float db = ray.start.y * ray.start.y;
-		float dc = ray.start.z * ray.start.z;
-		float ea = 2 * ray.start.x * ray.dir.x;
-		float eb = 2 * ray.start.y * ray.dir.y;
-		float ec = 2 * ray.start.z * ray.dir.z;
-		float fa = 2 * ray.dir.x * ray.dir.x;
-		float fb = 2 * ray.dir.y * ray.dir.y;
-		float fc = 2 * ray.dir.z * ray.dir.z;
+		float sx2 = ray.start.x * ray.start.x;
+		float sy2 = ray.start.y * ray.start.y;
+		float sz2 = ray.start.z * ray.start.z;
+		float sdx = 2 * ray.start.x * ray.dir.x;
+		float sdy = 2 * ray.start.y * ray.dir.y;
+		float sdz = 2 * ray.start.z * ray.dir.z;
+		float dx2 = ray.dir.x * ray.dir.x;
+		float dy2 = ray.dir.y * ray.dir.y;
+		float dz2 = ray.dir.z * ray.dir.z;
 
-		float c = (param.x*da + param.y*db + param.z*dc - 1);
-		float b = (param.x*ea + param.y*eb + param.z*ec);
-		float a = (param.x*fa + param.y*fb + param.z*fc);
+		float c = (param.x * sx2 + param.y * sy2 + param.z * sz2 - 1);
+		float b = (param.x * sdx + param.y * sdy + param.z * sdz);
+		float a = (param.x * dx2 + param.y * dy2 + param.z * dz2);
 		//end of my code
 
 		float discr = b * b - 4.0f * a * c;
@@ -378,8 +378,9 @@ public:
 				 points[faces[i+2]-1], points[faces[i+3]-1], points[faces[i+4]-1],0.1f, material2, silverMaterial));
  			// objects.push_back(new Sphere(vec3(rnd() - 0.5f, rnd() - 0.5f, rnd() - 0.5f), rnd() * 0.1f, material));
 		}
-		// objects.push_back(new Sphere(vec3(rnd() - 0.5f, rnd() - 0.5f, rnd() - 0.5f), rnd() * 0.1f, material));
-		objects.push_back(new Ellipsoid(vec3(1.3f,2.2f,1.9f), material));
+		// objects.push_back(new Sphere(vec3(rnd() - 0.5f, rnd() - 0.5f, rnd() - 0.5f), rnd() * 0.1f, goldMaterial));
+		// objects.push_back(new Ellipsoid(vec3(1.3f,2.2f,1.9f), material));
+		objects.push_back(new Ellipsoid(vec3(20.0f, 35.0f,40.0f), goldMaterial));
 		// objects.push_back(new Plane(vec3(0,0,0), vec3(1,0,0), vec3(0,1,0), material));
 		// objects.push_back(new Plane(vec3(0,0,0), vec3(0,0,1), vec3(0,1,0), material));
 		// objects.push_back(new Ellipsoid(vec3(.05f,.06f,.07f), goldMaterial));
