@@ -130,6 +130,49 @@ struct Ellipsoid : public Intersectable {
 	}
 };
 
+//----------------------------
+struct Plane : public Intersectable
+{
+	vec4 param;
+
+	Plane(const vec3& _p1, const vec3& _p2, const vec3& _p3, Material * _material)
+	{
+		material = _material;
+
+		vec3 p1p2 = _p2 - _p1;
+		vec3 p1p3 = _p3 - _p1;
+
+		vec3 normal = cross(p1p2, p1p3);
+		float d = -normal.x * _p1.x - normal.y * _p1.y - normal.z * _p1.z;
+
+		param = vec4(normal.x, normal.y, normal.z, d);
+
+		printf("Parameters are: %f, %f, %f, %f\n", param.x, param.y, param.z, d);
+
+	}
+
+	Hit intersect(const Ray& ray)
+	{
+		Hit hit;
+		hit.t = -1;
+
+		float sx = param.x * ray.start.x;
+		float sy = param.y * ray.start.y;
+		float sz = param.z * ray.start.z;
+
+		float dx = param.x * ray.dir.x;
+		float dy = param.y * ray.dir.y;
+		float dz = param.z * ray.dir.z;
+
+		hit.t = - (sx + sy + sz + param.w) / (dx + dy + dz);
+		// printf("t is: %f\n", hit.t);
+		hit.position = ray.start + ray.dir * hit.t;
+		hit.normal = normalize(vec3(param.x, param.y, param.z));
+		hit.material = material;
+		return hit;
+	}
+};
+
 struct Camera {
 //---------------------------
 	vec3 eye, lookat, right, up;
@@ -202,9 +245,44 @@ class Scene {
 	std::vector<Light *> lights;
 	Camera camera;
 	vec3 La;
+	vec3 points[20] = {vec3 (0, 0.618, 1.618),
+	vec3 (0, -0.618, 1.618),
+	vec3 (0, -0.618, -1.618),
+	vec3 (0, 0.618, -1.618),
+	vec3 (1.618, 0, 0.618),
+	vec3 (-1.618, 0, 0.618),
+	vec3 (-1.618, 0, -0.618),
+	vec3 (1.618, 0, -0.618),
+	vec3 (0.618, 1.618, 0),
+	vec3 (-0.618, 1.618, 0),
+	vec3 (-0.618, -1.618, 0),
+	vec3 (0.618, -1.618, 0),
+	vec3 (1, 1, 1),
+	vec3 (-1, 1, 1),
+	vec3 (-1, -1, 1),
+	vec3 (1, -1, 1),
+	vec3 (1, -1, -1),
+	vec3 (1, 1, -1),
+	vec3 (-1, 1, -1),
+	vec3 (-1, -1, -1)};
+
+	int faces[36] = {1,2,16,
+	1,13,9,
+	1,14,6,
+	2,15,11,
+	3,4,18,
+	3,17,12,
+	3,20,7,
+	19,10,9,
+	16,12,17,
+	5,8,18,
+	14,10,19,
+	6,7,20};
+
 public:
 	void build() {
-		vec3 eye = vec3(0, 0, 5.0f), vup = vec3(0, 1, 0), lookat = vec3(0, 0, 0);
+		// printf("Start\n");
+		vec3 eye = vec3(0, 0, 1.0f), vup = vec3(0, 1, 0), lookat = vec3(0, 0, 0);
 		float fov = 45 * M_PI / 180;
 		camera.set(eye, lookat, vup, fov);
 
@@ -215,6 +293,9 @@ public:
 		vec3 kd(0.3f, 0.2f, 0.1f), ks(2, 2, 2);
 		Material * material = new RoughMaterial(kd, ks, 50);
 
+		vec3 kd2(0.1f, 0.2f, 0.3f), ks2(2, 2, 2);
+		Material * material2 = new RoughMaterial(kd2, ks2, 50);
+
 		vec3 nGold (0.17f, 0.35f, 1.5f);
 		vec3 kGold (3.1f, 2.7f, 1.9f);
 		ReflectiveMat* goldMaterial= new ReflectiveMat(nGold, kGold);
@@ -222,25 +303,38 @@ public:
 		vec3 nSilver (0.14f, 0.16f, 0.13f);
 		vec3 kSilver (4.1f, 2.3f, 3.1f);
 		ReflectiveMat* silverMaterial = new ReflectiveMat(nSilver, kSilver);
-		for (int i = 0; i < 5; i++)
+
+		int facesSize = sizeof(faces)/ sizeof(int);
+		for (int i = 0; i < facesSize; i = i + 3)
 		{
+			objects.push_back(new Plane(points[faces[i]-1], points[faces[i+1]-1], points[faces[i+2]-1], material2));
 			// objects.push_back(new Sphere(vec3(rnd() - 0.5f, rnd() - 0.5f, rnd() - 0.5f), rnd() * 0.1f, material));
 		}
-		// objects.push_back(new Ellipsoid(vec3(.05f,.06f,.07f), goldMaterial));
+		// objects.push_back(new Plane(vec3(0,0,0), vec3(1,0,0), vec3(0,1,0), material));
+		// objects.push_back(new Plane(vec3(0,0,0), vec3(0,0,1), vec3(0,1,0), material));
+		objects.push_back(new Ellipsoid(vec3(.05f,.06f,.07f), goldMaterial));
+		// objects.push_back(new Plane(vec3(-1.0f,2.0f,1.0f), vec3(0.0f,-3.0f,2.0f), vec3(1.0f,1.0f,-4.0f), material));
+		// objects.push_back(new Plane(vec3(-2.0f,1.0f,-1.0f), vec3(0.0f,-2.0f,0.0f), vec3(1.0f,-1.0f,2.0f), material));
 		// objects.push_back(new Ellipsoid(vec3(.1f,.2f,.3f), goldMaterial));
-		// objects.push_back(new Sphere(vec3(rnd() - 0.5f, rnd() - 0.5f, rnd() - 0.5f), rnd() * 0.1f, goldMaterial));
-
+		// objects.push_back(new Sphere(vec3(0.0f, 0.0f, 0.0f), 0.2f, goldMaterial));
+		// printf("End\n");
 			// printf("random is %f\n", rnd());
 	}
 
 	void render(std::vector<vec4>& image) {
+		// printf("Start\n");
 		for (int Y = 0; Y < windowHeight; Y++) {
 #pragma omp parallel for
+		// printf("Start2\n");
 			for (int X = 0; X < windowWidth; X++) {
+				// printf("Start getray\n");
 				vec3 color = trace(camera.getRay(X, Y));
+				// printf("End getray\n");
 				image[Y * windowWidth + X] = vec4(color.x, color.y, color.z, 1);
 			}
+			// printf("End2\n");
 		}
+		// printf("End\n");
 	}
 
 	Hit firstIntersect(Ray ray) {
@@ -261,12 +355,13 @@ public:
 
 	vec3 trace(Ray ray, int depth = 0)
 	{
+	// printf("Start tracing\n");
 	if (depth > 5) return La;
 	Hit hit = firstIntersect(ray);
 	if (hit.t <0) return La;
-
 	if (hit.material->type == ROUGH)
 	{
+		// printf("Start rough\n");
 		vec3 outRadiance = hit.material->ka * La;
 		for (Light * light : lights) {
 			Ray shadowRay(hit.position + hit.normal * epsilon, light->direction);
@@ -278,9 +373,10 @@ public:
 				if (cosDelta > 0) outRadiance = outRadiance + light->Le * hit.material->ks * powf(cosDelta, hit.material->shininess);
 			}
 		}
+		// printf("End\n");
 		return outRadiance;
 	}
-
+	// printf("Start reflective\n");
 	float cosa = -dot(ray.dir, hit.normal);
 	vec3 one(1,1,1);
 	vec3 F = hit.material-> F0 + (one - hit.material->F0) * pow(1-cosa, 5);
@@ -289,6 +385,7 @@ public:
 
 	if (hit.material -> type == REFRACTIVE)
 	{
+		// printf("Start refractive\n");
 		float disc = 1 - (1- cosa * cosa) / hit.material-> ior / hit.material-> ior; // scalar n
 		if (disc >= 0)
 		{
@@ -296,6 +393,7 @@ public:
 			outRadiance = outRadiance + trace(Ray(hit.position - hit.normal * epsilon, refractedDir), depth + 1) * (one- F);
 		}
 	}
+	// printf("End\n");
 	return outRadiance;
 }
 /*
@@ -321,7 +419,6 @@ public:
 };
 
 GPUProgram gpuProgram; // vertex and fragment shaders
-GPUProgram DodegpuProgram; // vertex and fragment shaders
 Scene scene;
 
 // vertex shader in GLSL
@@ -353,6 +450,7 @@ const char *fragmentSource = R"(
 )";
 
 //my code
+/*
 // fragment shader in GLSL
 const char * const DodevertexSource = R"(
 	#version 330				// Shader 3.3
@@ -377,7 +475,9 @@ const char * const DodefragmentSource = R"(
 		outColor = vec4(color, 1);	// computed color is the color of the primitive
 	}
 )";
+*/
 
+/*
 class Dodecahedron
 {
 	unsigned int vao;	   // virtual world on the GPU
@@ -403,12 +503,25 @@ class Dodecahedron
 	}
 void Draw()
 {
-		glBindVertexArray(vao);  // Draw call
-		glDrawArrays(GL_TRIANGLES, 0 /*startIdx*/, 5 /*# Elements*/);
+	int location = glGetUniformLocation(gpuProgram.getId(), "color");
+	glUniform3f(location, 0.0f, 1.0f, 0.0f); // 3 floats
 
-		glutSwapBuffers(); // exchange buffers for double buffering
+	float MVPtransf[4][4] = { .1, 0, 0, 0,    // MVP matrix,
+								0, .1, 0, 0,    // row-major!
+								0, 0, .1, 0,
+								0, 0, 0, 1 };
+
+	location = glGetUniformLocation(gpuProgram.getId(), "MVP");	// Get the GPU location of uniform variable MVP
+	glUniformMatrix4fv(location, 1, GL_TRUE, &MVPtransf[0][0]);	// Load a 4x4 row-major float matrix to the specified location
+
+	glBindVertexArray(vao);  // Draw call
+	glDrawArrays(GL_TRIANGLE_STRIP, 0 , 20);
+
+	glutSwapBuffers(); // exchange buffers for double buffering
 	}
 };
+*/
+
 
 class FullScreenTexturedQuad {
 	unsigned int vao;	// vertex array object id and texture id
@@ -443,14 +556,8 @@ FullScreenTexturedQuad * fullScreenTexturedQuad;
 // Initialization, create an OpenGL context
 void onInitialization() {
 	glViewport(0, 0, windowWidth, windowHeight);
+
 	scene.build();
-	float cahedronVert[] = {0, 0.618, 1.618,0, -0.618, 1.618,0, -0.618, -1.618,0, 0.618, -1.618,1.618, 0,
-	0.618,-1.618, 0, 0.618,-1.618, 0, -0.618,1.618, 0, -0.618,0.618, 1.618, 0,
-	-0.618, 1.618, 0,-0.618, -1.618, 0,0.618, -1.618, 0,1, 1, 1,-1, 1, 1,-1, -1,
-	1,1, -1, 1,1, -1, -1,1, 1, -1,-1, 1, -1,-1, -1, -1};
-	glBufferData(GL_ARRAY_BUFFER, sizeof(cahedronVert), cahedronVert, GL_STATIC_DRAW);
-	// Dodecahedron dode (cahedronVert);
-	// dode.Draw();
 	std::vector<vec4> image(windowWidth * windowHeight);
 	long timeStart = glutGet(GLUT_ELAPSED_TIME);
 	scene.render(image);
