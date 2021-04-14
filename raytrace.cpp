@@ -136,9 +136,11 @@ struct Plane : public Intersectable
 	vec4 param;
 	Material * reflectivematerial;
 	vec3 points[5];
+	float threshold;
 
-	Plane(const vec3& _p1, const vec3& _p2, const vec3& _p3,const vec3& _p4, const vec3& _p5, Material * _roughmaterial, Material * _reflectivematerial)
+	Plane(const vec3& _p1, const vec3& _p2, const vec3& _p3,const vec3& _p4, const vec3& _p5, const float& _threshold, Material * _roughmaterial, Material * _reflectivematerial)
 	{
+		threshold = _threshold;
 		material = _roughmaterial;
 		reflectivematerial = _reflectivematerial;
 		points[0] = _p1;
@@ -183,7 +185,48 @@ struct Plane : public Intersectable
 		// printf("t is: %f\n", hit.t);
 		hit.position = ray.start + ray.dir * hit.t;
 		hit.normal = normalize(vec3(param.x, param.y, param.z));
-		hit.material = reflectivematerial;
+
+		// Find nearest 2 points for edge distance calcuation
+		vec3 nearestPoints[2] = {points[0], points[1]};
+		float smallestLengths[2] = {length(hit.position - points[0]), length(hit.position - points[1])};
+		for(int i = 2; i < 5; ++i)
+		{
+			vec3 newVector = hit.position - points[i];
+			float lengthVector = length(newVector);
+			if (lengthVector < smallestLengths[0] && lengthVector < smallestLengths[1])
+			{
+				if (smallestLengths[0] > smallestLengths[1])
+				{
+					nearestPoints[0] = points[i];
+					smallestLengths[0] = lengthVector;
+				}else
+				{
+					nearestPoints[1] = points[i];
+					smallestLengths[1] = lengthVector;
+				}
+			}else if (lengthVector < smallestLengths[0])
+			{
+				nearestPoints[0] = points[i];
+				smallestLengths[0] = lengthVector;
+			}else if (lengthVector < smallestLengths[1])
+			{
+				nearestPoints[1] = points[i];
+				smallestLengths[1] = lengthVector;
+			}
+		}
+		// printf("Hit position: %f %f %f\n", hit.position.x, hit.position.y, hit.position.z);
+		// printf("Closes 2 points are: %f %f %f,", nearestPoints[0].x, nearestPoints[0].y, nearestPoints[0].z);
+		// printf(" %f %f %f\n", nearestPoints[1].x, nearestPoints[1].y, nearestPoints[1].z);
+
+		// determine the distance to the closest edge
+		vec3 ab = nearestPoints[1] - nearestPoints[0];
+		vec3 ad = hit.position - nearestPoints[0];
+		float cosTheta = dot(ab, ad) / (length(ab) * length(ad));
+		float Theta = acos(cosTheta);
+		float edgedistance = length(ad) * sin(Theta);
+
+		if(edgedistance < threshold){hit.material = material;}
+		else {hit.material = reflectivematerial;}
 		return hit;
 	}
 };
@@ -206,12 +249,20 @@ public:
 		vec3 dir = lookat + right * (2.0f * (X + 0.5f) / windowWidth - 1) + up * (2.0f * (Y + 0.5f) / windowHeight - 1) - eye;
 		return Ray(eye, dir);
 	}
-	void Animate(float dt) {
+	void Animate(float dt)
+	{
+		vec3 d = eye - lookat;
+		eye = vec3(d.x * cos(dt) + d.z * sin(dt), d.y, - d.x * sin(dt) + d.z * cos(dt)) + lookat;
+		set(eye,lookat,up,fov);
+	}
+	/*
+	void Animate(flfoat dt) {
 		eye = vec3((eye.x - lookat.x) * cos(dt) + (eye.z - lookat.z) * sin(dt) + lookat.x,
 			eye.y,
 			-(eye.x - lookat.x) * sin(dt) + (eye.z - lookat.z) * cos(dt) + lookat.z);
 		set(eye, lookat, up, fov);
 	}
+	*/
 };
 
 /*
@@ -324,16 +375,16 @@ public:
 		for (int i = 0; i < facesSize; i = i + 5)
 		{
 			objects.push_back(new Plane(points[faces[i]-1], points[faces[i+1]-1],
-				 points[faces[i+2]-1], points[faces[i+3]-1], points[faces[i+4]-1], material2, silverMaterial));
- 			objects.push_back(new Sphere(vec3(rnd() - 0.5f, rnd() - 0.5f, rnd() - 0.5f), rnd() * 0.1f, material));
+				 points[faces[i+2]-1], points[faces[i+3]-1], points[faces[i+4]-1],0.1f, material2, silverMaterial));
+ 			// objects.push_back(new Sphere(vec3(rnd() - 0.5f, rnd() - 0.5f, rnd() - 0.5f), rnd() * 0.1f, material));
 		}
+		// objects.push_back(new Sphere(vec3(rnd() - 0.5f, rnd() - 0.5f, rnd() - 0.5f), rnd() * 0.1f, material));
+		objects.push_back(new Ellipsoid(vec3(1.3f,2.2f,1.9f), material));
 		// objects.push_back(new Plane(vec3(0,0,0), vec3(1,0,0), vec3(0,1,0), material));
 		// objects.push_back(new Plane(vec3(0,0,0), vec3(0,0,1), vec3(0,1,0), material));
 		// objects.push_back(new Ellipsoid(vec3(.05f,.06f,.07f), goldMaterial));
-		objects.push_back(new Ellipsoid(vec3(1.3f,2.2f,1.9f), goldMaterial));
 		// objects.push_back(new Plane(vec3(-1.0f,2.0f,1.0f), vec3(0.0f,-3.0f,2.0f), vec3(1.0f,1.0f,-4.0f), material));
 		// objects.push_back(new Plane(vec3(-2.0f,1.0f,-1.0f), vec3(0.0f,-2.0f,0.0f), vec3(1.0f,-1.0f,2.0f), material));
-
 		// objects.push_back(new Sphere(vec3(0.0f, 0.0f, 0.0f), 0.2f, goldMaterial));
 		// printf("End\n");
 			// printf("random is %f\n", rnd());
@@ -597,6 +648,9 @@ void onDisplay() {
 
 // Key of ASCII code pressed
 void onKeyboard(unsigned char key, int pX, int pY) {
+	printf("Key pressed\n");
+	scene.Animate(0.1f);
+	glutPostRedisplay();
 }
 
 // Key of ASCII code released
@@ -615,4 +669,5 @@ void onMouseMotion(int pX, int pY) {
 // Idle event indicating that some time elapsed: do animation here
 void onIdle() {
 	//printf("Animating");
+
 }
