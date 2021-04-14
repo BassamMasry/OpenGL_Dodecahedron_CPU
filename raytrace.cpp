@@ -319,19 +319,21 @@ public:
 		vec3 kSilver (4.1f, 2.3f, 3.1f);
 		ReflectiveMat* silverMaterial = new ReflectiveMat(nSilver, kSilver);
 
+
 		int facesSize = sizeof(faces)/ sizeof(int);
 		for (int i = 0; i < facesSize; i = i + 5)
 		{
 			objects.push_back(new Plane(points[faces[i]-1], points[faces[i+1]-1],
 				 points[faces[i+2]-1], points[faces[i+3]-1], points[faces[i+4]-1], material2, silverMaterial));
-			// objects.push_back(new Sphere(vec3(rnd() - 0.5f, rnd() - 0.5f, rnd() - 0.5f), rnd() * 0.1f, material));
+ 			objects.push_back(new Sphere(vec3(rnd() - 0.5f, rnd() - 0.5f, rnd() - 0.5f), rnd() * 0.1f, material));
 		}
 		// objects.push_back(new Plane(vec3(0,0,0), vec3(1,0,0), vec3(0,1,0), material));
 		// objects.push_back(new Plane(vec3(0,0,0), vec3(0,0,1), vec3(0,1,0), material));
-		objects.push_back(new Ellipsoid(vec3(.05f,.06f,.07f), goldMaterial));
+		// objects.push_back(new Ellipsoid(vec3(.05f,.06f,.07f), goldMaterial));
+		objects.push_back(new Ellipsoid(vec3(1.3f,2.2f,1.9f), goldMaterial));
 		// objects.push_back(new Plane(vec3(-1.0f,2.0f,1.0f), vec3(0.0f,-3.0f,2.0f), vec3(1.0f,1.0f,-4.0f), material));
 		// objects.push_back(new Plane(vec3(-2.0f,1.0f,-1.0f), vec3(0.0f,-2.0f,0.0f), vec3(1.0f,-1.0f,2.0f), material));
-		// objects.push_back(new Ellipsoid(vec3(.1f,.2f,.3f), goldMaterial));
+
 		// objects.push_back(new Sphere(vec3(0.0f, 0.0f, 0.0f), 0.2f, goldMaterial));
 		// printf("End\n");
 			// printf("random is %f\n", rnd());
