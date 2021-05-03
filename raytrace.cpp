@@ -378,9 +378,9 @@ public:
 				 points[faces[i+2]-1], points[faces[i+3]-1], points[faces[i+4]-1],0.1f, material2, silverMaterial));
  			// objects.push_back(new Sphere(vec3(rnd() - 0.5f, rnd() - 0.5f, rnd() - 0.5f), rnd() * 0.1f, material));
 		}
+		objects.push_back(new Ellipsoid(vec3(20.0f, 35.0f,40.0f), goldMaterial));
 		// objects.push_back(new Sphere(vec3(rnd() - 0.5f, rnd() - 0.5f, rnd() - 0.5f), rnd() * 0.1f, goldMaterial));
 		// objects.push_back(new Ellipsoid(vec3(1.3f,2.2f,1.9f), material));
-		objects.push_back(new Ellipsoid(vec3(20.0f, 35.0f,40.0f), goldMaterial));
 		// objects.push_back(new Plane(vec3(0,0,0), vec3(1,0,0), vec3(0,1,0), material));
 		// objects.push_back(new Plane(vec3(0,0,0), vec3(0,0,1), vec3(0,1,0), material));
 		// objects.push_back(new Ellipsoid(vec3(.05f,.06f,.07f), goldMaterial));
