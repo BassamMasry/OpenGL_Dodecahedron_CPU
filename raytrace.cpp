@@ -35,7 +35,9 @@ struct ReflectiveMat : Material
 		shininess = 50;
 		*/
 		vec3 one(1,1,1);
-		F0 = ((n-one) *(n-one) + kappa * kappa) / ((n + one) * (n +one) + kappa * kappa);
+		vec3 numerator = ((n-one) *(n-one) + kappa * kappa);
+		vec3 denomerator = ((n + one) * (n +one) + kappa * kappa);
+		F0 = vec3 (numerator.x / denomerator.x, numerator.y / denomerator.y, numerator.z / denomerator.z) ;
 	}
 };
 
